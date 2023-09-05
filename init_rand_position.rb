@@ -26,7 +26,7 @@ end
 # @raise [DuplicateException] 既に石が置かれているところに打とうとしたときに投げられる例外
 def play(i, current_stone, x_coord, y_coord)
   raise OutOfBoardException if x_coord > BOARD_SIZE || y_coord > BOARD_SIZE
-  raise BoardFullException if @amount_of_stones >= BOARD_SIZE ** 2
+  raise BoardFullException if @amount_of_stones >= (BOARD_SIZE-2*(MIN-1)) ** 2
   new_pos = [x_coord, y_coord]
   raise DuplicateException if @positions.include?(new_pos)
   @amount_of_stones += 1
@@ -65,14 +65,11 @@ if COORDS
       x_coord = @num_to_alphabet.index(pos_str[2].to_sym)+1
       y_coord = @num_to_alphabet.index(pos_str[3].to_sym)+1
       play(i, current_stone, x_coord, y_coord)
-    rescue => e
-      print e.message
-      case e
-      when BoardFullException
-        break 
-      when DuplicateException
-        redo
-      end
+    rescue BoardFullException => e
+      puts e.message
+      break 
+    rescue DuplicateException
+      redo
     end
   end
 else
@@ -82,14 +79,11 @@ else
       x_coord = rand(MIN..max_coord)
       y_coord = rand(MIN..max_coord)
       play(i, current_stone, x_coord, y_coord)
-    rescue => e
-      print e.message
-      case e
-      when BoardFullException
-        break
-      when DuplicateException
-        redo
-      end
+    rescue BoardFullException => e
+      puts e.message
+      break 
+    rescue DuplicateException
+      redo
     end
   end
 end
