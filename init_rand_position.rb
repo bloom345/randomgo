@@ -3,8 +3,8 @@ require 'date'
 class BoardFullException < RuntimeError; end
 class DuplicateException < RuntimeError; end
 
+# 一手(x, y)に打つ
 # COORDS指定時とそれ以外の共通プロセス
-# TODO: メソッド名変更
 def play(i, current_stone, x_coord, y_coord)
   if @amount_of_stones >= BOARD_SIZE ** 2
     raise BoardFullException.new("cannot put any more stones on the board!")
