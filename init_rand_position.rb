@@ -5,6 +5,12 @@ class DuplicateException < RuntimeError; end
 
 # 一手(x, y)に打つ
 # COORDS指定時とそれ以外の共通プロセス
+# @param [Fixnum] i; 手数（実際の手数-1）
+# @param [String] current_stone; 黒か白か。"B"→黒、"W"→白
+# @param [Fixnum] x_coord; x座標。左上始点の列座標 1始まり。
+# @param [Fixnum] y_coord; y座標。左上始点の行座標 1始まり。
+# @raise [BoardFullException] 打つ場所がないときに投げられる例外
+# @raise [DuplicateException] 既に石が置かれているところに打とうとしたときに投げられる例外
 def play(i, current_stone, x_coord, y_coord)
   if @amount_of_stones >= BOARD_SIZE ** 2
     raise BoardFullException.new("cannot put any more stones on the board!")
@@ -21,15 +27,20 @@ def play(i, current_stone, x_coord, y_coord)
 end
 
 FUSEKI_STONES_AMOUNT = (ENV["STONES"] || 10).to_i
-BOARD_SIZE = (ENV["SZ"] || 13).to_i
-MIN = (ENV["MIN"] || 2).to_i
+BOARD_SIZE = (ENV["SZ"] || 13).to_i # ボードサイズ 最大19
+MIN = (ENV["MIN"] || 2).to_i # MIN線以上に配置 MIN=3なら3線より上にしか配置しない
 COORDS = ENV["COORDS"] # "B[aa];W[ab]; ..." という文字列
+KOMI = (ENV["KM"] || 6.5).to_f
+RULE = ENV["RU"] || "Japanese" # Japanese or Chinese
+PB = ENV["PB"] || "black" # 黒番プレイヤー名
+PW = ENV["PW"] || "white" # 白番プレイヤー名
+raise "Board size should be equal to or less than 19!" if BOARD_SIZE > 19
 raise "Environment variable MIN should be less than half of board size!" if MIN > (BOARD_SIZE+1) / 2.0
 max_coord = BOARD_SIZE - (MIN - 1)
 @board = Array.new(BOARD_SIZE) { Array.new(BOARD_SIZE, '.')} 
 @num_to_alphabet = (:a..:s).to_a # 座標→アルファベットの変換用配列
 @positions = [] # 重複判定用
-@sgf_string = "(;GM[1]SZ[#{BOARD_SIZE}]PB[black]PW[white]KM[6.5]RU[Japanese];"
+@sgf_string = "(;GM[1]SZ[#{BOARD_SIZE}]PB[#{PB}]PW[#{PW}]KM[#{KOMI}]RU[#{RULE}];"
 @amount_of_stones = 0
 if COORDS
   COORDS.split(";").each_with_index do |pos_str, i|
