@@ -30,12 +30,75 @@ def play(i, current_stone, x_coord, y_coord)
   new_pos = [x_coord, y_coord]
   raise DuplicateException if @positions.include?(new_pos)
   @amount_of_stones += 1
-  @positions << new_pos
-  print "#{i+1}:#{current_stone}#{new_pos}, "
   @board[x_coord-1][y_coord-1] = current_stone
-  @sgf_string += "#{current_stone}[#{@num_to_alphabet[x_coord-1]}#{@num_to_alphabet[y_coord-1]}];"
+  no_of_breathing_points = search(x_coord-1, y_coord-1)
+  puts "呼吸点=#{no_of_breathing_points}"
+  show_board(@check)
+  if no_of_breathing_points == 0
+    puts "着手禁止点"
+    @board[x_coord-1][y_coord-1] = "." # ロールバック
+  else
+    @positions << new_pos
+    print "#{i+1}:#{current_stone}#{new_pos}, "
+    @sgf_string += "#{current_stone}[#{@num_to_alphabet[x_coord-1]}#{@num_to_alphabet[y_coord-1]}];"
+  end
+  # TODO: capture 処理を加える。打った場所の四方の石についてそれぞれsearchして、呼吸点0なら取り除く。
 end
 
+def capture
+  
+end
+
+def show_board(board=@board)
+  print "\n"
+  board.transpose.each do |column|
+    column.each { |e| print e }; print "\n"
+  end
+end
+
+# 座標を与えて、その座標にある石が属するグループの呼吸点の数を数える。
+# @param [Fixnum] x_pos; 0始まりのx座標
+# @param [Fixnum] y_pos; 0始まりのy座標
+# @return [Fixnum] 呼吸点の数
+def search(x_pos, y_pos, stone=nil)
+  puts "searching (#{x_pos+1},#{y_pos+1})..."
+  if x_pos < 0 || y_pos < 0 || x_pos >= BOARD_SIZE || y_pos >= BOARD_SIZE
+    puts "return 0"
+    return 0
+  end
+  pos = @board[x_pos][y_pos] 
+  if stone == nil
+    # 最初の呼び出し
+    @check = Array.new(BOARD_SIZE) { Array.new(BOARD_SIZE, 0)} 
+    return nil if pos == "." || pos == nil # ナンセンスなのでnilを返す
+    # posは"B"か"W"
+    @check[x_pos][y_pos] = pos
+    search(x_pos+1, y_pos, pos) + search(x_pos, y_pos+1, pos) + search(x_pos-1, y_pos, pos) + search(x_pos, y_pos-1, pos) 
+  else 
+    if @check[x_pos][y_pos] != 0
+      puts "return 0"
+      return 0 
+    end
+    case pos
+    when "."
+      @check[x_pos][y_pos] = pos
+      puts "return 1"
+      1
+    when stone
+      @check[x_pos][y_pos] = pos
+      search(x_pos+1, y_pos, pos) + search(x_pos, y_pos+1, pos) + search(x_pos-1, y_pos, pos) + search(x_pos, y_pos-1, pos) 
+    when nil
+      # 盤の範囲外
+      puts "return 0"
+      0
+    else
+      # 違う色の石
+      @check[x_pos][y_pos] = pos
+      puts "return 0"
+      0
+    end    
+  end
+end
 #-----------------------------------------------------------------------------------
 # 環境変数取得
 FUSEKI_STONES_AMOUNT = (ENV["STONES"] || 10).to_i
@@ -90,10 +153,7 @@ else
 end
 
 # ボード簡易表示
-print "\n"
-@board.transpose.each do |column|
-  column.each { |e| print e }; print "\n"
-end
+show_board
 
 @sgf_string += ")"
 puts @sgf_string
