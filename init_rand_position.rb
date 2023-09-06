@@ -10,7 +10,7 @@ class DuplicateException < Exception
     super(message)
   end
 end
-class OutOfBoardException < RuntimeError
+class OutOfBoardException < Exception
   def initialize(message="coordinate of the move is out of board!")
     super(message)
   end
