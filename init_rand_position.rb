@@ -32,8 +32,8 @@ def play(i, current_stone, x_coord, y_coord)
   @amount_of_stones += 1
   @board[x_coord-1][y_coord-1] = current_stone
   no_of_breathing_points = search(x_coord-1, y_coord-1)
-  puts "呼吸点=#{no_of_breathing_points}"
-  show_board(@check)
+  # puts "呼吸点=#{no_of_breathing_points}"
+  # show_board(@check)
   if no_of_breathing_points == 0
     puts "着手禁止点"
     @board[x_coord-1][y_coord-1] = "." # ロールバック
@@ -42,11 +42,67 @@ def play(i, current_stone, x_coord, y_coord)
     print "#{i+1}:#{current_stone}#{new_pos}, "
     @sgf_string += "#{current_stone}[#{@num_to_alphabet[x_coord-1]}#{@num_to_alphabet[y_coord-1]}];"
   end
-  # TODO: capture 処理を加える。打った場所の四方の石についてそれぞれsearchして、呼吸点0なら取り除く。
+  capture(x_coord-1, y_coord-1, current_stone)
+  show_board
 end
 
-def capture
-  
+# @param [String] stone; 
+# @return stoneの反対の色を返す
+def opposite(stone)
+  stone == "B" ? "W" : "B"
+end
+
+# チェック用ボードの(x_pos, y_pos)にある石に属するグループを配列で返す
+# @return [Array<Array>] [[1, 2], [1, 3], [2, 3], ...] のような配列。
+def group_positions(x_pos, y_pos, board=@check)
+  stone = board[x_pos][y_pos]
+  coords = []
+  board.each_with_index do |col, x|
+    col.each_with_index do |row, y|
+      coords << [x, y] if row==stone
+    end
+  end
+  coords
+end
+
+# 座標を与えて、その座標にある石によって呼吸点が0になった石を取り除く
+# @param [Fixnum] x_pos; 0始まりのx座標
+# @param [Fixnum] y_pos; 0始まりのy座標
+# @param [String] stone; x_pos, y_posに打たれた石。黒なら"B"、白なら"W"
+def capture(x_pos, y_pos, stone)
+  if x_pos+1 < BOARD_SIZE && @board[x_pos+1][y_pos] == opposite(stone)
+    if search(x_pos+1, y_pos) == 0
+       group_positions(x_pos+1, y_pos).each do |x, y|
+         @board[x][y] = "."
+         @positions.delete([x+1, y+1])
+       end
+    end
+  end
+  if y_pos+1 < BOARD_SIZE && @board[x_pos][y_pos+1] == opposite(stone)
+    if search(x_pos, y_pos+1) == 0
+       group_positions(x_pos, y_pos+1).each do |x, y|
+         @board[x][y] = "."
+         @positions.delete([x+1, y+1])
+       end
+    end
+  end
+  if x_pos-1 >= 0 && @board[x_pos-1][y_pos] == opposite(stone)
+    if search(x_pos-1, y_pos) == 0
+       group_positions(x_pos-1, y_pos).each do |x, y|
+         @board[x][y] = "."
+         @positions.delete([x+1, y+1])
+      end
+    end
+  end
+  if y_pos-1 >= 0 && @board[x_pos][y_pos-1] == opposite(stone)
+    if search(x_pos, y_pos-1) == 0
+       group_positions(x_pos, y_pos-1).each do |x, y|
+         puts "(#{x+1}, #{y+1}) is captured."
+         @board[x][y] = "."
+         @positions.delete([x+1, y+1])
+       end
+    end
+  end
 end
 
 def show_board(board=@board)
@@ -59,44 +115,38 @@ end
 # 座標を与えて、その座標にある石が属するグループの呼吸点の数を数える。
 # @param [Fixnum] x_pos; 0始まりのx座標
 # @param [Fixnum] y_pos; 0始まりのy座標
+# @param [String] stone; 黒なら"B"、白なら"W"
 # @return [Fixnum] 呼吸点の数
 def search(x_pos, y_pos, stone=nil)
-  puts "searching (#{x_pos+1},#{y_pos+1})..."
-  if x_pos < 0 || y_pos < 0 || x_pos >= BOARD_SIZE || y_pos >= BOARD_SIZE
-    puts "return 0"
-    return 0
-  end
-  pos = @board[x_pos][y_pos] 
-  if stone == nil
-    # 最初の呼び出し
-    @check = Array.new(BOARD_SIZE) { Array.new(BOARD_SIZE, 0)} 
-    return nil if pos == "." || pos == nil # ナンセンスなのでnilを返す
-    # posは"B"か"W"
-    @check[x_pos][y_pos] = pos
-    search(x_pos+1, y_pos, pos) + search(x_pos, y_pos+1, pos) + search(x_pos-1, y_pos, pos) + search(x_pos, y_pos-1, pos) 
-  else 
-    if @check[x_pos][y_pos] != 0
-      puts "return 0"
-      return 0 
+  if x_pos < 0 || y_pos < 0 || x_pos >= BOARD_SIZE || y_pos >= BOARD_SIZE # 盤端
+    0
+  else
+    pos = @board[x_pos][y_pos] 
+    if stone == nil # 最初の呼び出し
+      @check = Array.new(BOARD_SIZE) { Array.new(BOARD_SIZE, 0)} 
+      if pos == "." || pos == nil # ナンセンスなのでnilを返す
+        nil 
+      else # posは"B"か"W"
+	@check[x_pos][y_pos] = pos
+	search(x_pos+1, y_pos, pos) + search(x_pos, y_pos+1, pos) + search(x_pos-1, y_pos, pos) + search(x_pos, y_pos-1, pos) 
+      end
+    else 
+      if @check[x_pos][y_pos] != 0 # 探索済
+	 0 
+      else 
+	case pos
+	when "." # 空点 このときのみ呼吸点が増える
+	  @check[x_pos][y_pos] = pos
+	  1
+	when stone
+	  @check[x_pos][y_pos] = pos
+	  search(x_pos+1, y_pos, pos) + search(x_pos, y_pos+1, pos) + search(x_pos-1, y_pos, pos) + search(x_pos, y_pos-1, pos) 
+	else # 違う色の石
+	  @check[x_pos][y_pos] = pos
+	  0
+	end    
+      end
     end
-    case pos
-    when "."
-      @check[x_pos][y_pos] = pos
-      puts "return 1"
-      1
-    when stone
-      @check[x_pos][y_pos] = pos
-      search(x_pos+1, y_pos, pos) + search(x_pos, y_pos+1, pos) + search(x_pos-1, y_pos, pos) + search(x_pos, y_pos-1, pos) 
-    when nil
-      # 盤の範囲外
-      puts "return 0"
-      0
-    else
-      # 違う色の石
-      @check[x_pos][y_pos] = pos
-      puts "return 0"
-      0
-    end    
   end
 end
 #-----------------------------------------------------------------------------------
