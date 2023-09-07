@@ -15,6 +15,11 @@ class OutOfBoardException < Exception
     super(message)
   end
 end
+class ForbiddenMoveException < Exception
+  def initialize(message="Forbidden move")
+    super(message)
+  end
+end
 
 # (x, y)に指定の石を打つ
 # @param [Fixnum] i; 手数（実際の手数-1）
@@ -29,19 +34,19 @@ def play(i, current_stone, x_coord, y_coord)
   raise BoardFullException if @amount_of_stones >= (MAX-MIN+1) ** 2
   new_pos = [x_coord, y_coord]
   raise DuplicateException if @positions.include?(new_pos)
-  @amount_of_stones += 1
   @board[x_coord-1][y_coord-1] = current_stone
   no_of_breathing_points = search(x_coord-1, y_coord-1)
   # puts "呼吸点=#{no_of_breathing_points}"
   # show_board(@check)
   if no_of_breathing_points == 0
-    puts "着手禁止点"
     @board[x_coord-1][y_coord-1] = "." # ロールバック
+    raise ForbiddenMoveException
   else
     @positions << new_pos
     print "#{i+1}:#{current_stone}#{new_pos}, "
     @sgf_string += "#{current_stone}[#{@num_to_alphabet[x_coord-1]}#{@num_to_alphabet[y_coord-1]}];"
   end
+  @amount_of_stones += 1
   capture(x_coord-1, y_coord-1, current_stone)
   show_board
 end
@@ -73,6 +78,7 @@ def capture(x_pos, y_pos, stone)
   if x_pos+1 < BOARD_SIZE && @board[x_pos+1][y_pos] == opposite(stone)
     if search(x_pos+1, y_pos) == 0
        group_positions(x_pos+1, y_pos).each do |x, y|
+         puts "(#{x+1}, #{y+1}) is captured."
          @board[x][y] = "."
          @positions.delete([x+1, y+1])
        end
@@ -81,6 +87,7 @@ def capture(x_pos, y_pos, stone)
   if y_pos+1 < BOARD_SIZE && @board[x_pos][y_pos+1] == opposite(stone)
     if search(x_pos, y_pos+1) == 0
        group_positions(x_pos, y_pos+1).each do |x, y|
+         puts "(#{x+1}, #{y+1}) is captured."
          @board[x][y] = "."
          @positions.delete([x+1, y+1])
        end
@@ -89,6 +96,7 @@ def capture(x_pos, y_pos, stone)
   if x_pos-1 >= 0 && @board[x_pos-1][y_pos] == opposite(stone)
     if search(x_pos-1, y_pos) == 0
        group_positions(x_pos-1, y_pos).each do |x, y|
+         puts "(#{x+1}, #{y+1}) is captured."
          @board[x][y] = "."
          @positions.delete([x+1, y+1])
       end
@@ -173,7 +181,8 @@ raise "Environment variable MIN should be less than half of board size!" if MIN 
 @amount_of_stones = 0
 
 if COORDS
-  COORDS.split(";").each_with_index do |pos_str, i|
+  moves = COORDS.split(";")
+  moves.each_with_index do |pos_str, i|
     begin 
       current_stone = pos_str[0]
       x_coord = @num_to_alphabet.index(pos_str[2].to_sym)+1
@@ -184,6 +193,8 @@ if COORDS
       break 
     rescue DuplicateException
       redo
+    rescue ForbiddenMoveException
+      next # 座標指定の場合にはやり直しできないのでnext
     end
   end
 else
@@ -198,6 +209,9 @@ else
       break 
     rescue DuplicateException
       redo
+    rescue ForbiddenMoveException => e
+      puts e.message
+      redo # ランダム生成の場合には繰り返し
     end
   end
 end
@@ -207,7 +221,7 @@ show_board
 
 @sgf_string += ")"
 puts @sgf_string
-filename ="sgf/random_SZ#{BOARD_SIZE}_NOS#{FUSEKI_STONES_AMOUNT}_#{DateTime.now.strftime('%Y%m%d%H%M%S')}.sgf" 
+filename = COORDS ? "sgf/fixed_SZ#{BOARD_SIZE}_MV#{moves.size}_#{DateTime.now.strftime('%Y%m%d%H%M%S')}.sgf" : "sgf/random_SZ#{BOARD_SIZE}_NOS#{FUSEKI_STONES_AMOUNT}_#{DateTime.now.strftime('%Y%m%d%H%M%S')}.sgf" 
 begin
   File.open(filename, "w") do |f|
     f.write(@sgf_string)
