@@ -31,13 +31,13 @@ end
 # @raise [DuplicateException] 既に石が置かれているところに打とうとしたときに投げられる例外
 def play(i, current_stone, x_coord, y_coord)
   raise OutOfBoardException if x_coord > BOARD_SIZE || y_coord > BOARD_SIZE
+  # FIXME: 着手禁止点の数を考慮しないと無限ループのリスク？
   raise BoardFullException if @amount_of_stones >= (MAX-MIN+1) ** 2
   new_pos = [x_coord, y_coord]
   raise DuplicateException if @positions.include?(new_pos)
   @board[x_coord-1][y_coord-1] = current_stone
   no_of_breathing_points = search(x_coord-1, y_coord-1)
-  # puts "呼吸点=#{no_of_breathing_points}"
-  # show_board(@check)
+  # show_board(@check) # search後には、どのようにsearchしたかがshow_boardの引数に@checkを渡すことで確認できる。
   if no_of_breathing_points == 0
     @board[x_coord-1][y_coord-1] = "." # ロールバック
     raise ForbiddenMoveException
@@ -127,7 +127,7 @@ def capture(x_pos, y_pos, stone)
     group_positions(x,y).each do |capped_x, capped_y|
       @board[capped_x][capped_y] = "."
       @positions.delete([capped_x+1, capped_y+1])
-      puts "(#{capped_x+1}, #{capped_y+1}) is captured."
+      puts "#{opposite(stone)}@(#{capped_x+1}, #{capped_y+1}) is captured."
     end
   end
 end
@@ -231,13 +231,10 @@ else
       redo
     rescue ForbiddenMoveException => e
       puts e.message
-      redo # ランダム生成の場合には繰り返し
+      redo # ランダム生成で着手禁止点に打たれた場合には繰り返し
     end
   end
 end
-
-# ボード簡易表示
-show_board
 
 @sgf_string += ")"
 puts @sgf_string
