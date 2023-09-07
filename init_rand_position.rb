@@ -70,11 +70,12 @@ def group_positions(x_pos, y_pos, board=@check)
   coords
 end
 
+=begin
 # 座標を与えて、その座標にある石によって呼吸点が0になった石を取り除く
 # @param [Fixnum] x_pos; 0始まりのx座標
 # @param [Fixnum] y_pos; 0始まりのy座標
 # @param [String] stone; x_pos, y_posに打たれた石。黒なら"B"、白なら"W"
-def capture(x_pos, y_pos, stone)
+def capture_(x_pos, y_pos, stone)
   if x_pos+1 < BOARD_SIZE && @board[x_pos+1][y_pos] == opposite(stone)
     if search(x_pos+1, y_pos) == 0
        group_positions(x_pos+1, y_pos).each do |x, y|
@@ -112,7 +113,26 @@ def capture(x_pos, y_pos, stone)
     end
   end
 end
+=end
 
+# 今打った石によって、呼吸点が0になった石群を取り除く
+# @param [Fixnum] x_pos 今打った石の列座標（0始まり）
+# @param [Fixnum] y_pos 今打った石の行座標（0始まり）
+# @param [String] stone 今打った石の色（"B"or"W"）
+def capture(x_pos, y_pos, stone)
+  # 隣接点についてそれぞれ確認
+  [[x_pos+1,y_pos], [x_pos,y_pos+1], [x_pos-1,y_pos], [x_pos,y_pos-1]].each do |x, y|
+    next unless x.between?(0,BOARD_SIZE-1) && y.between?(0,BOARD_SIZE-1) && @board[x][y]==opposite(stone)
+    next unless search(x,y)==0
+    group_positions(x,y).each do |capped_x, capped_y|
+      @board[capped_x][capped_y] = "."
+      @positions.delete([capped_x+1, capped_y+1])
+      puts "(#{capped_x+1}, #{capped_y+1}) is captured."
+    end
+  end
+end
+
+# 盤面の表示
 def show_board(board=@board)
   print "\n"
   board.transpose.each do |column|
