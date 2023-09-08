@@ -20,6 +20,11 @@ class ForbiddenMoveException < Exception
     super(message)
   end
 end
+class KoException < Exception
+  def initialize(message="Ko and cannot move")
+    super(message)
+  end
+end
 
 # (x, y)に指定の石を打つ
 # @param [Fixnum] i; 手数（実際の手数-1）
@@ -30,6 +35,7 @@ end
 # @raise [BoardFullException] 打つ場所がないときに投げられる例外
 # @raise [DuplicateException] 既に石が置かれているところに打とうとしたときに投げられる例外
 def play(i, current_stone, x_coord, y_coord)
+  @ko_potential = nil unless @ko_potential && @ko_potential[0]==i-1 
   raise OutOfBoardException if x_coord > BOARD_SIZE || y_coord > BOARD_SIZE
   # FIXME: 着手禁止点の数を考慮しないと無限ループのリスク？
   raise BoardFullException if @amount_of_stones >= (MAX-MIN+1) ** 2
@@ -38,16 +44,29 @@ def play(i, current_stone, x_coord, y_coord)
   @board[x_coord-1][y_coord-1] = current_stone
   no_of_breathing_points = search(x_coord-1, y_coord-1)
   # show_board(@check) # search後には、どのようにsearchしたかがshow_boardの引数に@checkを渡すことで確認できる。
-  if no_of_breathing_points == 0
-    @board[x_coord-1][y_coord-1] = "." # ロールバック
-    raise ForbiddenMoveException
+  case no_of_breathing_points
+  when 0
+    if capture(x_coord-1, y_coord-1, current_stone, estimate: true).size > 0
+      # 石がとれるなら着手禁止ではないが、コウならKoException投げる
+      raise KoException if @ko_potential && new_pos==@ko_potential[2]
+      @positions << new_pos
+      print "#{i+1}:#{current_stone}#{new_pos}, "
+      @sgf_string += "#{current_stone}[#{@num_to_alphabet[x_coord-1]}#{@num_to_alphabet[y_coord-1]}];"
+    else
+      @board[x_coord-1][y_coord-1] = "." # ロールバック
+      raise ForbiddenMoveException
+    end
   else
     @positions << new_pos
     print "#{i+1}:#{current_stone}#{new_pos}, "
     @sgf_string += "#{current_stone}[#{@num_to_alphabet[x_coord-1]}#{@num_to_alphabet[y_coord-1]}];"
   end
   @amount_of_stones += 1
-  capture(x_coord-1, y_coord-1, current_stone)
+  capped_pos=capture(x_coord-1, y_coord-1, current_stone)
+  if capped_pos.size==1 && no_of_breathing_points==0
+    @ko_potential=[i, new_pos, capped_pos.first]
+    puts "Ko potential #{@ko_potential}"
+  end
   show_board
 end
 
@@ -70,66 +89,28 @@ def group_positions(x_pos, y_pos, board=@check)
   coords
 end
 
-=begin
-# 座標を与えて、その座標にある石によって呼吸点が0になった石を取り除く
-# @param [Fixnum] x_pos; 0始まりのx座標
-# @param [Fixnum] y_pos; 0始まりのy座標
-# @param [String] stone; x_pos, y_posに打たれた石。黒なら"B"、白なら"W"
-def capture_(x_pos, y_pos, stone)
-  if x_pos+1 < BOARD_SIZE && @board[x_pos+1][y_pos] == opposite(stone)
-    if search(x_pos+1, y_pos) == 0
-       group_positions(x_pos+1, y_pos).each do |x, y|
-         puts "(#{x+1}, #{y+1}) is captured."
-         @board[x][y] = "."
-         @positions.delete([x+1, y+1])
-       end
-    end
-  end
-  if y_pos+1 < BOARD_SIZE && @board[x_pos][y_pos+1] == opposite(stone)
-    if search(x_pos, y_pos+1) == 0
-       group_positions(x_pos, y_pos+1).each do |x, y|
-         puts "(#{x+1}, #{y+1}) is captured."
-         @board[x][y] = "."
-         @positions.delete([x+1, y+1])
-       end
-    end
-  end
-  if x_pos-1 >= 0 && @board[x_pos-1][y_pos] == opposite(stone)
-    if search(x_pos-1, y_pos) == 0
-       group_positions(x_pos-1, y_pos).each do |x, y|
-         puts "(#{x+1}, #{y+1}) is captured."
-         @board[x][y] = "."
-         @positions.delete([x+1, y+1])
-      end
-    end
-  end
-  if y_pos-1 >= 0 && @board[x_pos][y_pos-1] == opposite(stone)
-    if search(x_pos, y_pos-1) == 0
-       group_positions(x_pos, y_pos-1).each do |x, y|
-         puts "(#{x+1}, #{y+1}) is captured."
-         @board[x][y] = "."
-         @positions.delete([x+1, y+1])
-       end
-    end
-  end
-end
-=end
-
 # 今打った石によって、呼吸点が0になった石群を取り除く
 # @param [Fixnum] x_pos 今打った石の列座標（0始まり）
 # @param [Fixnum] y_pos 今打った石の行座標（0始まり）
 # @param [String] stone 今打った石の色（"B"or"W"）
-def capture(x_pos, y_pos, stone)
+# @param [True/False] estimate @board, @positionsを実際に操作せずに石をとれるかどうか確認する
+# @return [Array<Array>] アゲハマの座標の配列
+def capture(x_pos, y_pos, stone, estimate: false)
+  capped_stone_pos=[]
   # 隣接点についてそれぞれ確認
   [[x_pos+1,y_pos], [x_pos,y_pos+1], [x_pos-1,y_pos], [x_pos,y_pos-1]].each do |x, y|
     next unless x.between?(0,BOARD_SIZE-1) && y.between?(0,BOARD_SIZE-1) && @board[x][y]==opposite(stone)
     next unless search(x,y)==0
     group_positions(x,y).each do |capped_x, capped_y|
-      @board[capped_x][capped_y] = "."
-      @positions.delete([capped_x+1, capped_y+1])
-      puts "#{opposite(stone)}@(#{capped_x+1}, #{capped_y+1}) is captured."
+      unless estimate
+        @board[capped_x][capped_y] = "."
+        @positions.delete([capped_x+1, capped_y+1])
+        puts "#{opposite(stone)}@(#{capped_x+1}, #{capped_y+1}) is captured."
+      end
+      capped_stone_pos << [capped_x+1, capped_y+1]
     end
   end
+  capped_stone_pos
 end
 
 # 盤面の表示
@@ -212,9 +193,13 @@ if COORDS
       puts e.message
       break 
     rescue DuplicateException
-      redo
+      next # 座標指定の場合にはやり直しできないのでnext
     rescue ForbiddenMoveException
       next # 座標指定の場合にはやり直しできないのでnext
+    rescue KoException => e
+      puts e.message
+      puts "Skipped."
+      next
     end
   end
 else
@@ -232,6 +217,10 @@ else
     rescue ForbiddenMoveException => e
       puts e.message
       redo # ランダム生成で着手禁止点に打たれた場合には繰り返し
+    rescue KoException => e
+      puts e.message
+      puts "Retrying.."
+      redo 
     end
   end
 end
