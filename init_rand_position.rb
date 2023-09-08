@@ -21,7 +21,7 @@ class ForbiddenMoveException < Exception
   end
 end
 class KoException < Exception
-  def initialize(message="Ko and cannot move")
+  def initialize(pos, message="Ko and cannot play at #{pos}")
     super(message)
   end
 end
@@ -34,6 +34,8 @@ end
 # @raise [OutOfBoardException] 座標でボードの外側を指定したときに投げられる例外
 # @raise [BoardFullException] 打つ場所がないときに投げられる例外
 # @raise [DuplicateException] 既に石が置かれているところに打とうとしたときに投げられる例外
+# @raise [ForbiddenMoveException] 着手禁止点に打とうとしたときに投げられる例外
+# @raise [KoException] コウで打てないときに投げられる例外
 def play(i, current_stone, x_coord, y_coord)
   @ko_potential = nil unless @ko_potential && @ko_potential[0]==i-1 
   raise OutOfBoardException if x_coord > BOARD_SIZE || y_coord > BOARD_SIZE
@@ -48,7 +50,7 @@ def play(i, current_stone, x_coord, y_coord)
   when 0
     if capture(x_coord-1, y_coord-1, current_stone, estimate: true).size > 0
       # 石がとれるなら着手禁止ではないが、コウならKoException投げる
-      raise KoException if @ko_potential && new_pos==@ko_potential[2]
+      raise KoException.new(new_pos) if @ko_potential && new_pos==@ko_potential[2]
       @positions << new_pos
       print "#{i+1}:#{current_stone}#{new_pos}, "
       @sgf_string += "#{current_stone}[#{@num_to_alphabet[x_coord-1]}#{@num_to_alphabet[y_coord-1]}];"
