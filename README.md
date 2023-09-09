@@ -8,12 +8,13 @@
 # 19路、黒白20子ずつ、中国ルール
 % SZ=19 STONES=20 RU=Chinese ruby init_rand_position.rb
 
+# 13路、座標指定
 % SZ=13 COORDS="B[ab];W[ac];" ruby init_rand_position.rb
 ```
 
 ### 環境変数
 
-SZ 碁盤のサイズ。1〜19までの整数。デフォルト:13
-STONES 各色の石の数。デフォルト:10
-COORDS ランダム配置ではなく、座標をSGFファイル形式で指定できる。
+- SZ 碁盤のサイズ。1〜19までの整数。デフォルト:13
+- STONES 各色の石の数。デフォルト:10
+- COORDS ランダム配置ではなく、座標をSGFファイル形式で指定できる。
 
