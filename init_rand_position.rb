@@ -69,6 +69,7 @@ def play(i, current_stone, x_coord, y_coord)
     @ko_potential=[i, new_pos, capped_pos.first]
     puts "Ko potential #{@ko_potential}"
   end
+  @amount_of_stones -= capped_pos.size
   show_board
 end
 
@@ -123,13 +124,32 @@ def show_board(board=@board)
   end
 end
 
+# 有効着手点の座標を取得
+def valid_moves(board=@board)
+  valid_moves_hash = {"B"=>[], "W"=>[]}
+  board.each_with_index do |col, x|
+    col.each_with_index do |row, y|
+      next unless board[x][y]=="." && x.between?(MIN-1, MAX-1) && y.between?(MIN-1, MAX-1) 
+      valid_moves_hash.keys.each do |stone|
+	board[x][y] = stone
+	unless search(x,y)==0 && capture(x, y, stone, estimate: true).size==0
+	  # 呼吸点が0で、石も一つも取れない場合には着手禁止点
+	  valid_moves_hash[stone] << [x, y] 
+        end
+        board[x][y] = "."
+      end
+    end
+  end
+  valid_moves_hash
+end
+
 # 座標を与えて、その座標にある石が属するグループの呼吸点の数を数える。
 # @param [Fixnum] x_pos; 0始まりのx座標
 # @param [Fixnum] y_pos; 0始まりのy座標
 # @param [String] stone; 黒なら"B"、白なら"W"
 # @return [Fixnum] 呼吸点の数
 def search(x_pos, y_pos, stone=nil)
-  if x_pos < 0 || y_pos < 0 || x_pos >= BOARD_SIZE || y_pos >= BOARD_SIZE # 盤端
+  unless x_pos.between?(0,BOARD_SIZE-1) && y_pos.between?(0,BOARD_SIZE-1)
     0
   else
     pos = @board[x_pos][y_pos] 
@@ -190,6 +210,14 @@ if COORDS
       current_stone = pos_str[0]
       x_coord = @num_to_alphabet.index(pos_str[2].to_sym)+1
       y_coord = @num_to_alphabet.index(pos_str[3].to_sym)+1
+      vm_hash = valid_moves
+      puts vm_hash.to_s
+      # 黒も白も打てなければ例外、どちらか打てるならパス
+      raise BoardFullException if vm_hash[current_stone].size==0 && vm_hash[opposite(current_stone)].size==0
+      if vm_hash[current_stone].size==0
+        puts "No valid moves. Pass"
+        next
+      end
       play(i, current_stone, x_coord, y_coord)
     rescue BoardFullException => e
       puts e.message
@@ -207,10 +235,17 @@ if COORDS
 else
   (FUSEKI_STONES_AMOUNT*2).times do |i|
     begin
-     current_stone = (i % 2 == 0) ? "B" : "W"
-      x_coord = rand(MIN..MAX)
-      y_coord = rand(MIN..MAX)
-      play(i, current_stone, x_coord, y_coord)
+      current_stone = (i % 2 == 0) ? "B" : "W"
+      vm_hash = valid_moves
+      puts vm_hash.to_s
+      # 黒も白も打てなければ例外、どちらか打てるならパス
+      raise BoardFullException if vm_hash[current_stone].size==0 && vm_hash[opposite(current_stone)].size==0
+      if vm_hash[current_stone].size==0
+        puts "No valid moves. Pass"
+        next
+      end
+      new_move = vm_hash[current_stone].sample
+      play(i, current_stone, new_move[0]+1, new_move[1]+1)
     rescue BoardFullException => e
       puts e.message
       break 
