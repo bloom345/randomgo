@@ -65,7 +65,7 @@ def play(i, current_stone, x_coord, y_coord)
   end
   @amount_of_stones += 1
   capped_pos=capture(x_coord-1, y_coord-1, current_stone)
-  if capped_pos.size==1 && no_of_breathing_points==0
+  if capped_pos.size==1 && no_of_breathing_points==0 && group_positions(x_coord-1, y_coord-1, @board).size==1
     @ko_potential=[i, new_pos, capped_pos.first]
     puts "Ko potential #{@ko_potential}"
   end
@@ -184,9 +184,9 @@ end
 # 環境変数取得
 FUSEKI_STONES_AMOUNT = (ENV["STONES"] || 10).to_i
 BOARD_SIZE = (ENV["SZ"] || 13).to_i # ボードサイズ 最大19
-MIN = (ENV["MIN"] || 2).to_i # MIN線以上に配置 MIN=3なら3線より上にしか配置しない
-MAX = BOARD_SIZE-MIN+1 
 COORDS = ENV["COORDS"] # "B[aa];W[ab]; ..." という文字列
+MIN = COORDS ? 1 : (ENV["MIN"] || 2).to_i # MIN線以上に配置 MIN=3なら3線より上にしか配置しない
+MAX = BOARD_SIZE-MIN+1 
 KOMI = (ENV["KM"] || 6.5).to_f
 RULE = ENV["RU"] || "Japanese" # Japanese or Chinese
 PB = ENV["PB"] || "black" # 黒番プレイヤー名
