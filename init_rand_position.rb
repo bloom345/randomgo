@@ -39,7 +39,6 @@ end
 def play(i, current_stone, x_coord, y_coord)
   @ko_potential = nil unless @ko_potential && @ko_potential[0]==i-1 
   raise OutOfBoardException if x_coord > BOARD_SIZE || y_coord > BOARD_SIZE
-  # FIXME: 着手禁止点の数を考慮しないと無限ループのリスク？
   raise BoardFullException if @amount_of_stones >= (MAX-MIN+1) ** 2
   new_pos = [x_coord, y_coord]
   raise DuplicateException if @positions.include?(new_pos)
@@ -65,7 +64,7 @@ def play(i, current_stone, x_coord, y_coord)
   end
   @amount_of_stones += 1
   capped_pos=capture(x_coord-1, y_coord-1, current_stone)
-  if capped_pos.size==1 && no_of_breathing_points==0 && group_positions(x_coord-1, y_coord-1, @board).size==1
+  if capped_pos.size==1 && no_of_breathing_points==0 && group_positions(x_coord-1, y_coord-1, false).size==1
     @ko_potential=[i, new_pos, capped_pos.first]
     puts "Ko potential #{@ko_potential}"
   end
@@ -80,8 +79,13 @@ def opposite(stone)
 end
 
 # チェック用ボードの(x_pos, y_pos)にある石に属するグループを配列で返す
-# @return [Array<Array>] [[1, 2], [1, 3], [2, 3], ...] のような配列。
-def group_positions(x_pos, y_pos, board=@check)
+# @param [Fixnum] x_pos 列座標（0始まり）
+# @param [Fixnum] y_pos 行座標（0始まり）
+# @param [True/False] already_searched 同じ引数で直前にsearchメソッドが実行されている(=@checkが更新されている)かどうか
+# @return [Array<Array>] 指定のx_pos, y_posの石が属するグループの座標を[[0, 2], [0, 3], [1, 3], ...] のような配列で返す。（0始まり）
+def group_positions(x_pos, y_pos, already_searched=true)
+  search(x_pos, y_pos) unless already_searched
+  board = @check
   stone = board[x_pos][y_pos]
   coords = []
   board.each_with_index do |col, x|
@@ -97,7 +101,7 @@ end
 # @param [Fixnum] y_pos 今打った石の行座標（0始まり）
 # @param [String] stone 今打った石の色（"B"or"W"）
 # @param [True/False] estimate @board, @positionsを実際に操作せずに石をとれるかどうか確認する
-# @return [Array<Array>] アゲハマの座標の配列
+# @return [Array<Array>] アゲハマの座標の配列（1始まり）
 def capture(x_pos, y_pos, stone, estimate: false)
   capped_stone_pos=[]
   # 隣接点についてそれぞれ確認
